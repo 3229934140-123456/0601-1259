@@ -6,6 +6,7 @@ import Icons from "@/pages/Icons";
 import Rules from "@/pages/Rules";
 import Preview from "@/pages/Preview";
 import Export from "@/pages/Export";
+import PreviewShare from "@/pages/PreviewShare";
 import ProjectLayout from "@/components/ProjectLayout";
 
 export default function App() {
@@ -61,6 +62,7 @@ export default function App() {
             </ProjectLayout>
           }
         />
+        <Route path="/preview-share" element={<PreviewShare />} />
         <Route path="*" element={<Home />} />
       </Routes>
     </Router>

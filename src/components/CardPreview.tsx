@@ -79,7 +79,7 @@ function CardElementView({ element }: { element: CardElement }) {
     case 'image':
       return <img src={element.content} style={style} alt="" className="object-cover" />
     case 'icon':
-      return <div style={style} className="flex items-center justify-center">{element.content}</div>
+      return <img src={element.content} style={style} alt="" className="object-contain" />
     default:
       return <div style={style}>{element.content}</div>
   }

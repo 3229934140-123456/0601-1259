@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, Trash2, Bold, Italic, List, Heading1, Link2, ChevronUp, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, Bold, Italic, List, Heading1, Link2, ChevronUp, ChevronDown, Layers } from 'lucide-react'
 import { useRuleStore } from '@/stores/ruleStore'
 import { useCardStore } from '@/stores/cardStore'
+import { useDeckStore } from '@/stores/deckStore'
 import CardPreview from '@/components/CardPreview'
 import Modal, { ConfirmModal } from '@/components/Modal'
 import { cn } from '@/lib/utils'
@@ -11,6 +12,7 @@ export default function Rules() {
   const { projectId } = useParams()
   const { rule, chapters, loadRule, createRule, addChapter, deleteChapter, updateChapter, reorderChapters, addCardRef } = useRuleStore()
   const { loadCards, getProjectCards, getCard } = useCardStore()
+  const { decks, loadDecks, getDeckCards, getDeckTotal } = useDeckStore()
 
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null)
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null)
@@ -26,8 +28,9 @@ export default function Rules() {
     if (projectId) {
       loadRule(projectId)
       loadCards(projectId)
+      loadDecks(projectId)
     }
-  }, [projectId, loadRule, loadCards])
+  }, [projectId, loadRule, loadCards, loadDecks])
 
   useEffect(() => {
     if (projectId && rule === null && useRuleStore.getState().rule === null) {
@@ -369,6 +372,7 @@ export default function Rules() {
             <CardPreview card={previewCardData} width={160} showNumber />
             {previewCardData.attributes.length > 0 && (
               <div className="mt-4 w-full">
+                <h4 className="text-sm font-medium text-forge-text mb-2">卡牌属性</h4>
                 {previewCardData.attributes.map(attr => (
                   <div key={attr.id} className="flex justify-between py-1 border-b border-forge-border text-sm">
                     <span className="text-forge-text-muted">{attr.label}</span>
@@ -377,6 +381,35 @@ export default function Rules() {
                 ))}
               </div>
             )}
+            <div className="mt-4 w-full">
+              <h4 className="text-sm font-medium text-forge-text mb-2 flex items-center gap-2">
+                <Layers size={14} className="text-forge-gold" />
+                所属牌组
+              </h4>
+              {decks.length === 0 ? (
+                <p className="text-sm text-forge-text-muted">暂无牌组</p>
+              ) : (
+                <div className="space-y-2">
+                  {decks.map(deck => {
+                    const deckCards = getDeckCards(deck.id)
+                    const cardInDeck = deckCards.find(dc => dc.cardId === previewCardData.id)
+                    if (!cardInDeck) return null
+                    return (
+                      <div
+                        key={deck.id}
+                        className="flex items-center justify-between px-3 py-2 bg-forge-elevated rounded-lg"
+                      >
+                        <span className="text-sm text-forge-text">{deck.name}</span>
+                        <span className="text-sm text-forge-gold font-medium">×{cardInDeck.quantity}</span>
+                      </div>
+                    )
+                  })}
+                  {decks.filter(deck => getDeckCards(deck.id).some(dc => dc.cardId === previewCardData.id)).length === 0 && (
+                    <p className="text-sm text-forge-text-muted">这张卡牌还没有加入任何牌组</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </Modal>

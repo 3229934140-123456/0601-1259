@@ -131,12 +131,17 @@ export default function Canvas() {
     if (!activeCardId || !projectId) return
     const pendingIcon = retrievePendingIcon()
     if (pendingIcon) {
-      const centerX = (project?.cardWidth || 63) * MM_TO_PX / 2 - 20
-      const centerY = (project?.cardHeight || 88) * MM_TO_PX / 2 - 20
-      const iconElement = createIconElement(centerX, centerY, pendingIcon)
+      const cardWidth = (project?.cardWidth || 63) * MM_TO_PX
+      const cardHeight = (project?.cardHeight || 88) * MM_TO_PX
+      const iconSize = Math.min(cardWidth, cardHeight) * 0.3
+      const centerX = cardWidth / 2 - iconSize / 2
+      const centerY = cardHeight / 2 - iconSize / 2
+      const iconElement = createIconElement(centerX, centerY, pendingIcon, iconSize, iconSize)
       addElement(activeCardId, activeSide, iconElement)
+      setSelectedTool('select')
+      setSelectedElementId(iconElement.id)
     }
-  }, [activeCardId, projectId])
+  }, [activeCardId, projectId, activeSide, addElement, project, setSelectedTool, setSelectedElementId])
 
   useEffect(() => {
     const handleBeforeUnload = () => {

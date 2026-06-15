@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
-import { FileText, Image, Link2, Copy, Check, Settings, Grid3X3, Plus, Minus } from 'lucide-react'
+import { FileText, Image, Link2, Copy, Check, Settings, Grid3X3, Plus, Minus, ChevronLeft, ChevronRight, Layers } from 'lucide-react'
 import { useDeckStore } from '@/stores/deckStore'
 import { useCardStore } from '@/stores/cardStore'
 import { useProjectStore } from '@/stores/projectStore'
@@ -20,6 +20,7 @@ const CROP_LINE_LENGTH = 8
 interface PrintCard {
   cardId: string
   quantity: number
+  side: 'front' | 'back'
 }
 
 export default function Export() {
@@ -37,6 +38,8 @@ export default function Export() {
   const [showCropLines, setShowCropLines] = useState(true)
   const [showBleed, setShowBleed] = useState(true)
   const [selectedDeckIds, setSelectedDeckIds] = useState<string[]>([])
+  const [doubleSided, setDoubleSided] = useState(false)
+  const [currentPage, setCurrentPage] = useState(0)
   const [shareLink, setShareLink] = useState('')
   const [copied, setCopied] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
@@ -57,28 +60,57 @@ export default function Export() {
     }
   }, [decks, selectedDeckIds.length])
 
+  useEffect(() => {
+    setCurrentPage(0)
+  }, [selectedDeckIds, doubleSided, cols, rows, cardGap])
+
   const project = projectId ? getProject(projectId) : null
   const paper = PAPER_SIZES[paperSize]
 
   const allCards: PrintCard[] = selectedDeckIds.flatMap(deckId => {
     const deckCards = getDeckCards(deckId)
-    return deckCards.map(dc => ({
-      cardId: dc.cardId,
-      quantity: dc.quantity,
-    }))
+    return deckCards.flatMap(dc => {
+      if (doubleSided) {
+        return [
+          { cardId: dc.cardId, quantity: dc.quantity, side: 'front' as const },
+          { cardId: dc.cardId, quantity: dc.quantity, side: 'back' as const },
+        ]
+      }
+      return [{ cardId: dc.cardId, quantity: dc.quantity, side: 'front' as const }]
+    })
   })
 
-  const cardMap = new Map<string, number>()
+  const cardMap = new Map<string, { front: number; back: number }>()
   allCards.forEach(pc => {
-    cardMap.set(pc.cardId, (cardMap.get(pc.cardId) || 0) + pc.quantity)
+    const existing = cardMap.get(pc.cardId) || { front: 0, back: 0 }
+    if (pc.side === 'front') {
+      existing.front += pc.quantity
+    } else {
+      existing.back += pc.quantity
+    }
+    cardMap.set(pc.cardId, existing)
   })
 
-  const flattenedCards: string[] = []
-  cardMap.forEach((qty, cardId) => {
-    for (let i = 0; i < qty; i++) {
-      flattenedCards.push(cardId)
-    }
-  })
+  const flattenedCards: { cardId: string; side: 'front' | 'back' }[] = []
+  if (doubleSided) {
+    const fronts: { cardId: string; side: 'front' }[] = []
+    const backs: { cardId: string; side: 'back' }[] = []
+    cardMap.forEach((qty, cardId) => {
+      for (let i = 0; i < qty.front; i++) {
+        fronts.push({ cardId, side: 'front' })
+      }
+      for (let i = 0; i < qty.back; i++) {
+        backs.push({ cardId, side: 'back' })
+      }
+    })
+    flattenedCards.push(...fronts, ...backs)
+  } else {
+    cardMap.forEach((qty, cardId) => {
+      for (let i = 0; i < qty.front; i++) {
+        flattenedCards.push({ cardId, side: 'front' })
+      }
+    })
+  }
 
   const totalCards = flattenedCards.length
   const cardsPerPage = cols * rows
@@ -163,7 +195,7 @@ export default function Export() {
   }, [shareLink])
 
   const handleExportPDF = useCallback(async () => {
-    if (!previewRef.current || exporting) return
+    if (!previewRef.current || exporting || totalCards === 0) return
 
     setExporting(true)
     try {
@@ -177,20 +209,22 @@ export default function Export() {
       })
 
       for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
-        const canvas = await html2canvas(previewRef.current, {
+        const pageElement = previewRef.current.querySelector(`[data-page-index="${pageIdx}"]`) as HTMLElement
+        if (!pageElement) continue
+
+        const originalDisplay = pageElement.style.display
+        pageElement.style.display = 'block'
+
+        const canvas = await html2canvas(pageElement, {
           scale: 2,
           backgroundColor: '#ffffff',
           logging: false,
           useCORS: true,
           windowWidth: previewRef.current.scrollWidth,
           windowHeight: previewRef.current.scrollHeight,
-          ignoreElements: (el) => {
-            if (el.classList.contains('page-indicator')) {
-              return (el as HTMLElement).dataset.pageIndex !== String(pageIdx)
-            }
-            return false
-          },
         })
+
+        pageElement.style.display = originalDisplay
 
         const imgData = canvas.toDataURL('image/png')
         if (pageIdx > 0) pdf.addPage()
@@ -203,30 +237,32 @@ export default function Export() {
     } finally {
       setExporting(false)
     }
-  }, [exporting, paper, paperSize, totalPages, project?.name])
+  }, [exporting, paper, paperSize, totalPages, project?.name, totalCards])
 
   const handleExportPNG = useCallback(async () => {
-    if (!previewRef.current || exporting) return
+    if (!previewRef.current || exporting || totalCards === 0) return
 
     setExporting(true)
     try {
       const html2canvas = (await import('html2canvas')).default
 
       for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
-        const canvas = await html2canvas(previewRef.current, {
+        const pageElement = previewRef.current.querySelector(`[data-page-index="${pageIdx}"]`) as HTMLElement
+        if (!pageElement) continue
+
+        const originalDisplay = pageElement.style.display
+        pageElement.style.display = 'block'
+
+        const canvas = await html2canvas(pageElement, {
           scale: 2,
           backgroundColor: '#ffffff',
           logging: false,
           useCORS: true,
           windowWidth: previewRef.current.scrollWidth,
           windowHeight: previewRef.current.scrollHeight,
-          ignoreElements: (el) => {
-            if (el.classList.contains('page-indicator')) {
-              return (el as HTMLElement).dataset.pageIndex !== String(pageIdx)
-            }
-            return false
-          },
         })
+
+        pageElement.style.display = originalDisplay
 
         const link = document.createElement('a')
         link.download = `${project?.name || 'cards'}_page_${pageIdx + 1}.png`
@@ -240,7 +276,7 @@ export default function Export() {
     } finally {
       setExporting(false)
     }
-  }, [exporting, totalPages, project?.name])
+  }, [exporting, totalPages, project?.name, totalCards])
 
   const toggleDeck = (deckId: string) => {
     setSelectedDeckIds(prev =>
@@ -250,10 +286,10 @@ export default function Export() {
     )
   }
 
-  const cardDistribution = Array.from(cardMap.entries()).reduce<{ card: Card; quantity: number }[]>((acc, [cardId, qty]) => {
+  const cardDistribution = Array.from(cardMap.entries()).reduce<{ card: Card; frontQty: number; backQty: number }[]>((acc, [cardId, qty]) => {
     const card = getCard(cardId)
     if (card) {
-      acc.push({ card, quantity: qty })
+      acc.push({ card, frontQty: qty.front, backQty: qty.back })
     }
     return acc
   }, [])
@@ -291,6 +327,10 @@ export default function Export() {
     )
   }
 
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(0, Math.min(totalPages - 1, page)))
+  }
+
   return (
     <div className="flex h-full bg-forge-bg">
       <aside className="w-[280px] flex-shrink-0 border-r border-forge-border bg-forge-surface flex flex-col">
@@ -320,6 +360,32 @@ export default function Export() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="flex items-center justify-between cursor-pointer">
+              <span className="text-sm text-forge-text-secondary flex items-center gap-2">
+                <Layers size={14} />
+                正反面成套排版
+              </span>
+              <div
+                className={cn(
+                  'w-11 h-6 rounded-full p-0.5 transition-colors cursor-pointer',
+                  doubleSided ? 'bg-forge-gold' : 'bg-forge-elevated'
+                )}
+                onClick={() => setDoubleSided(!doubleSided)}
+              >
+                <div
+                  className={cn(
+                    'w-5 h-5 rounded-full bg-white transition-transform',
+                    doubleSided ? 'translate-x-5' : 'translate-x-0'
+                  )}
+                />
+              </div>
+            </label>
+            <p className="text-xs text-forge-text-muted pl-6">
+              开启后正面和背面分开排版，方便双面打印
+            </p>
           </div>
 
           <div>
@@ -488,15 +554,74 @@ export default function Export() {
           <h2 className="text-forge-text font-medium">打印预览</h2>
           <div className="flex items-center gap-4 text-sm">
             <span className="text-forge-text-muted">
-              共 <span className="text-forge-gold">{totalPages}</span> 页
+              第 <span className="text-forge-gold font-medium">{currentPage + 1}</span> / {totalPages} 页
             </span>
             <span className="text-forge-text-muted">
-              <span className="text-forge-gold">{totalCards}</span> 张卡牌
+              共 <span className="text-forge-gold">{totalCards}</span> 张卡牌
             </span>
             <span className="text-forge-text-muted">
               每页 <span className="text-forge-gold">{cardsPerPage}</span> 张
             </span>
           </div>
+        </div>
+
+        <div className="flex items-center justify-center gap-2 py-2 border-b border-forge-border bg-forge-surface/20">
+          <button
+            className="w-8 h-8 flex items-center justify-center rounded bg-forge-elevated text-forge-text-secondary hover:text-forge-text disabled:opacity-30"
+            onClick={() => goToPage(0)}
+            disabled={currentPage === 0}
+          >
+            «
+          </button>
+          <button
+            className="w-8 h-8 flex items-center justify-center rounded bg-forge-elevated text-forge-text-secondary hover:text-forge-text disabled:opacity-30"
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage === 0}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <div className="flex items-center gap-1 px-3">
+            {Array.from({ length: Math.min(totalPages, 7) }).map((_, i) => {
+              let pageNum = i
+              if (totalPages > 7) {
+                if (currentPage <= 3) {
+                  pageNum = i
+                } else if (currentPage >= totalPages - 4) {
+                  pageNum = totalPages - 7 + i
+                } else {
+                  pageNum = currentPage - 3 + i
+                }
+              }
+              return (
+                <button
+                  key={pageNum}
+                  className={cn(
+                    'w-8 h-8 rounded text-sm font-medium transition-colors',
+                    currentPage === pageNum
+                      ? 'bg-forge-gold text-forge-bg'
+                      : 'bg-forge-elevated text-forge-text-secondary hover:text-forge-text'
+                  )}
+                  onClick={() => goToPage(pageNum)}
+                >
+                  {pageNum + 1}
+                </button>
+              )
+            })}
+          </div>
+          <button
+            className="w-8 h-8 flex items-center justify-center rounded bg-forge-elevated text-forge-text-secondary hover:text-forge-text disabled:opacity-30"
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage === totalPages - 1}
+          >
+            <ChevronRight size={16} />
+          </button>
+          <button
+            className="w-8 h-8 flex items-center justify-center rounded bg-forge-elevated text-forge-text-secondary hover:text-forge-text disabled:opacity-30"
+            onClick={() => goToPage(totalPages - 1)}
+            disabled={currentPage === totalPages - 1}
+          >
+            »
+          </button>
         </div>
 
         <div className="flex-1 overflow-auto p-8 bg-forge-bg/50 flex items-start justify-center">
@@ -517,18 +642,18 @@ export default function Export() {
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  display: pageIdx === 0 ? 'block' : 'none',
+                  display: pageIdx === currentPage ? 'block' : 'none',
                 }}
               >
-                {flattenedCards.map((cardId, idx) => {
+                {flattenedCards.map((item, idx) => {
                   const pos = getCardPosition(idx, pageIdx)
                   if (!pos) return null
 
-                  const card = getCard(cardId)
+                  const card = getCard(item.cardId)
                   if (!card) return null
 
                   return (
-                    <div key={`${cardId}-${idx}`}>
+                    <div key={`${item.cardId}-${item.side}-${idx}`}>
                       {showBleed && (
                         <div
                           className="absolute"
@@ -556,10 +681,22 @@ export default function Export() {
                           card={card}
                           width={cardWidthPx}
                           height={cardHeightPx}
+                          side={item.side}
                           showNumber={false}
                         />
                       </div>
                       {renderCropLines(pos.x, pos.y, cardWidthPx, cardHeightPx)}
+                      {doubleSided && (
+                        <div
+                          className="absolute text-[10px] px-1.5 py-0.5 rounded bg-forge-bg/80 text-forge-gold font-medium"
+                          style={{
+                            left: pos.x + 4,
+                            top: pos.y + 4,
+                          }}
+                        >
+                          {item.side === 'front' ? '正' : '反'}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -583,6 +720,11 @@ export default function Export() {
                   <span className="text-forge-text">
                     卡牌种类: <span className="text-forge-gold font-medium">{cardDistribution.length}</span>
                   </span>
+                  {doubleSided && (
+                    <span className="text-forge-text">
+                      排版: <span className="text-forge-gold font-medium">双面</span>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -618,7 +760,7 @@ export default function Export() {
             <div className="mt-3 pt-3 border-t border-forge-border">
               <div className="text-xs text-forge-text-muted mb-2">卡牌数量分布</div>
               <div className="flex flex-wrap gap-2">
-                {cardDistribution.map(({ card, quantity }) => (
+                {cardDistribution.map(({ card, frontQty, backQty }) => (
                   <div
                     key={card.id}
                     className="flex items-center gap-2 px-2 py-1 bg-forge-elevated rounded text-xs"
@@ -628,7 +770,11 @@ export default function Export() {
                       style={{ background: card.background }}
                     />
                     <span className="text-forge-text-secondary truncate max-w-[120px]">{card.name}</span>
-                    <span className="text-forge-gold font-medium">×{quantity}</span>
+                    {doubleSided ? (
+                      <span className="text-forge-gold font-medium">正×{frontQty} 反×{backQty}</span>
+                    ) : (
+                      <span className="text-forge-gold font-medium">×{frontQty}</span>
+                    )}
                   </div>
                 ))}
               </div>
