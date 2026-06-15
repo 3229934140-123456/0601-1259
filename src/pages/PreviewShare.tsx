@@ -16,7 +16,7 @@ interface ShareData {
 }
 
 const SHARE_STORAGE_KEY = 'cf_share_data'
-const SHARE_STATE_KEY = 'cf_share_state'
+const SHARE_STATE_KEY_PREFIX = 'cf_share_state_'
 
 interface DrawHistoryItem {
   id: string
@@ -46,6 +46,15 @@ const defaultShareState: ShareState = {
   lastUpdated: 0,
 }
 
+const getShareIdentity = (data: ShareData | null): string => {
+  if (!data) return 'default'
+  return `${data.project.id}_${data.timestamp}`
+}
+
+const getShareStateKey = (identity: string): string => {
+  return `${SHARE_STATE_KEY_PREFIX}${identity}`
+}
+
 export default function PreviewShare() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -58,20 +67,24 @@ export default function PreviewShare() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [showRuleSummary, setShowRuleSummary] = useState(false)
 
+  const shareIdentity = useMemo(() => getShareIdentity(shareData), [shareData])
+
   const saveShareState = useCallback((state: ShareState) => {
     try {
-      localStorage.setItem(SHARE_STATE_KEY, JSON.stringify({
+      const key = getShareStateKey(shareIdentity)
+      localStorage.setItem(key, JSON.stringify({
         ...state,
         lastUpdated: Date.now(),
       }))
     } catch (e) {
       console.error('Failed to save share state:', e)
     }
-  }, [])
+  }, [shareIdentity])
 
-  const loadShareState = useCallback((): ShareState | null => {
+  const loadShareState = useCallback((identity: string): ShareState | null => {
     try {
-      const saved = localStorage.getItem(SHARE_STATE_KEY)
+      const key = getShareStateKey(identity)
+      const saved = localStorage.getItem(key)
       if (saved) {
         const parsed = JSON.parse(saved)
         if (Date.now() - parsed.lastUpdated < 24 * 60 * 60 * 1000) {
@@ -94,9 +107,12 @@ export default function PreviewShare() {
         localStorage.setItem(SHARE_STORAGE_KEY, JSON.stringify(parsed))
         setLoadError(null)
 
-        const savedState = loadShareState()
+        const identity = getShareIdentity(parsed)
+        const savedState = loadShareState(identity)
         if (savedState) {
           setShareState(savedState)
+        } else {
+          setShareState(defaultShareState)
         }
       } catch (e) {
         console.error('Failed to parse share data:', e)
@@ -107,9 +123,12 @@ export default function PreviewShare() {
             setShareData(parsed)
             setLoadError('链接数据解析失败，已加载上次访问的分享数据')
 
-            const savedState = loadShareState()
+            const identity = getShareIdentity(parsed)
+            const savedState = loadShareState(identity)
             if (savedState) {
               setShareState(savedState)
+            } else {
+              setShareState(defaultShareState)
             }
           } catch {
             setLoadError('无法解析分享数据，请检查链接是否完整')
@@ -125,9 +144,12 @@ export default function PreviewShare() {
           const parsed = JSON.parse(saved) as ShareData
           setShareData(parsed)
 
-          const savedState = loadShareState()
+          const identity = getShareIdentity(parsed)
+          const savedState = loadShareState(identity)
           if (savedState) {
             setShareState(savedState)
+          } else {
+            setShareState(defaultShareState)
           }
         } catch {
           setLoadError('没有找到分享数据')
@@ -143,6 +165,33 @@ export default function PreviewShare() {
   const decks = shareData?.decks || []
   const deckCards = shareData?.deckCards || []
   const chapters = shareData?.chapters || []
+
+  const projectCover = useMemo(() => {
+    if (project?.thumbnail) {
+      return project.thumbnail
+    }
+    const firstCard = cards[0]
+    const bgColor = firstCard?.background || '#2E2824'
+    const accentColor = '#d4a853'
+    const initialChar = (project?.name || '卡').charAt(0)
+    const cardCount = cards.length
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="112" height="112" viewBox="0 0 112 112">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="${bgColor}" />
+            <stop offset="100%" stop-color="#1A1614" />
+          </linearGradient>
+        </defs>
+        <rect width="112" height="112" rx="8" fill="url(#g)" />
+        <rect x="8" y="8" width="96" height="96" rx="6" fill="none" stroke="${accentColor}" stroke-width="1.5" stroke-dasharray="4 2" opacity="0.4" />
+        <text x="56" y="58" text-anchor="middle" font-family="serif" font-size="40" font-weight="bold" fill="${accentColor}" opacity="0.9">${initialChar}</text>
+        <text x="56" y="86" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#ffffff" opacity="0.7">${cardCount} 张卡牌</text>
+        <rect x="40" y="94" width="32" height="2" rx="1" fill="${accentColor}" opacity="0.6" />
+      </svg>
+    `
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+  }, [project?.thumbnail, project?.name, cards])
 
   const getCard = useCallback((cardId: string) => {
     return cards.find(c => c.id === cardId) || null
@@ -345,11 +394,9 @@ export default function PreviewShare() {
       <header className="border-b border-forge-border bg-forge-surface/80 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            {project?.thumbnail && (
-              <div className="w-14 h-14 rounded-lg overflow-hidden border border-forge-border shadow-lg flex-shrink-0">
-                <img src={project.thumbnail} alt={project.name} className="w-full h-full object-cover" />
-              </div>
-            )}
+            <div className="w-14 h-14 rounded-lg overflow-hidden border border-forge-border shadow-lg flex-shrink-0">
+              <img src={projectCover} alt={project?.name || '项目封面'} className="w-full h-full object-cover" />
+            </div>
             <div>
               <h1 className="text-lg font-display text-forge-text">{project?.name || '分享试玩'}</h1>
               <p className="text-xs text-forge-text-muted">卡牌设计工坊 · 分享试玩</p>

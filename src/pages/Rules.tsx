@@ -135,13 +135,13 @@ export default function Rules() {
 
   const jumpToCard = (cardId: string) => {
     if (projectId) {
-      navigate(`/project/${projectId}/canvas?cardId=${cardId}`)
+      navigate(`/canvas/${projectId}?cardId=${cardId}`)
     }
   }
 
   const jumpToDeck = (cardId: string) => {
     if (projectId) {
-      navigate(`/project/${projectId}/decks?highlightCardId=${cardId}`)
+      navigate(`/decks/${projectId}?highlightCardId=${cardId}`)
     }
   }
 

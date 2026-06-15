@@ -217,32 +217,52 @@ export default function Export() {
 
   const verifyExport = useCallback((pagesData: { pageIndex: number; cards: { cardId: string; side: 'front' | 'back' }[] }[]) => {
     const errors: string[] = []
-    const pageCardIds = new Map<number, Set<string>>()
 
-    pagesData.forEach(({ pageIndex, cards }) => {
-      const ids = new Set<string>()
-      cards.forEach(c => ids.add(`${c.cardId}-${c.side}`))
-      pageCardIds.set(pageIndex, ids)
+    const expectedCounts = new Map<string, number>()
+    flattenedCards.forEach(item => {
+      const key = `${item.cardId}-${item.side}`
+      expectedCounts.set(key, (expectedCounts.get(key) || 0) + 1)
     })
 
-    for (let i = 0; i < pagesData.length; i++) {
-      for (let j = i + 1; j < pagesData.length; j++) {
-        const pageI = pageCardIds.get(i)!
-        const pageJ = pageCardIds.get(j)!
-        const intersection = [...pageI].filter(x => pageJ.has(x))
-        if (intersection.length > 0) {
-          errors.push(`第${i + 1}页和第${j + 1}页存在重复卡牌: ${intersection.slice(0, 3).join(', ')}${intersection.length > 3 ? '...' : ''}`)
-        }
+    const actualCounts = new Map<string, number>()
+    pagesData.forEach(({ cards }) => {
+      cards.forEach(c => {
+        const key = `${c.cardId}-${c.side}`
+        actualCounts.set(key, (actualCounts.get(key) || 0) + 1)
+      })
+    })
+
+    expectedCounts.forEach((expected, key) => {
+      const actual = actualCounts.get(key) || 0
+      if (actual !== expected) {
+        const [cardId, side] = key.split('-')
+        const card = getCard(cardId)
+        const name = card?.name || cardId.slice(0, 8)
+        errors.push(`${name}(${side === 'front' ? '正面' : '背面'}): 预期${expected}张，实际导出${actual}张`)
       }
-    }
+    })
+
+    actualCounts.forEach((actual, key) => {
+      if (!expectedCounts.has(key)) {
+        const [cardId, side] = key.split('-')
+        const card = getCard(cardId)
+        const name = card?.name || cardId.slice(0, 8)
+        errors.push(`存在未预期的卡牌: ${name}(${side === 'front' ? '正面' : '背面'}) 出现${actual}次`)
+      }
+    })
 
     const totalExported = pagesData.reduce((sum, p) => sum + p.cards.length, 0)
     if (totalExported !== totalCards) {
-      errors.push(`导出卡牌数量不匹配: 预期${totalCards}张，实际${totalExported}张`)
+      errors.push(`导出卡牌总数不匹配: 预期${totalCards}张，实际${totalExported}张`)
+    }
+
+    const actualPageCount = pagesData.length
+    if (actualPageCount < totalPages) {
+      errors.push(`页数不足: 预期${totalPages}页，实际只导出${actualPageCount}页`)
     }
 
     return { verified: errors.length === 0, errors }
-  }, [totalCards])
+  }, [totalCards, flattenedCards, totalPages, getCard])
 
   const generateShareLink = useCallback(() => {
     if (!projectId || !project) return
