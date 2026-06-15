@@ -37,7 +37,8 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
     const deck: Deck = { id: uuid(), projectId, name, description: '' }
     set(state => {
       const decks = [...state.decks, deck]
-      localStorage.setItem(decksKey(projectId), JSON.stringify(decks))
+      const projectDecks = decks.filter(d => d.projectId === projectId)
+      localStorage.setItem(decksKey(projectId), JSON.stringify(projectDecks))
       return { decks }
     })
     return deck.id
@@ -49,8 +50,13 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
       const deckCards = state.deckCards.filter(dc => dc.deckId !== id)
       const pid = state.decks.find(d => d.id === id)?.projectId
       if (pid) {
-        localStorage.setItem(decksKey(pid), JSON.stringify(decks))
-        localStorage.setItem(deckCardsKey(pid), JSON.stringify(deckCards))
+        const projectDecks = decks.filter(d => d.projectId === pid)
+        const projectDeckCards = deckCards.filter(dc => {
+          const deck = state.decks.find(d => d.id === dc.deckId)
+          return deck?.projectId === pid
+        })
+        localStorage.setItem(decksKey(pid), JSON.stringify(projectDecks))
+        localStorage.setItem(deckCardsKey(pid), JSON.stringify(projectDeckCards))
       }
       return { decks, deckCards }
     })
@@ -60,7 +66,10 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
     set(state => {
       const decks = state.decks.map(d => d.id === id ? { ...d, ...updates } : d)
       const pid = state.decks.find(d => d.id === id)?.projectId
-      if (pid) localStorage.setItem(decksKey(pid), JSON.stringify(decks))
+      if (pid) {
+        const projectDecks = decks.filter(d => d.projectId === pid)
+        localStorage.setItem(decksKey(pid), JSON.stringify(projectDecks))
+      }
       return { decks }
     })
   },
@@ -77,7 +86,13 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
         deckCards = [...state.deckCards, { id: uuid(), deckId, cardId, quantity }]
       }
       const pid = state.decks.find(d => d.id === deckId)?.projectId
-      if (pid) localStorage.setItem(deckCardsKey(pid), JSON.stringify(deckCards))
+      if (pid) {
+        const projectDeckCards = deckCards.filter(dc => {
+          const deck = state.decks.find(d => d.id === dc.deckId)
+          return deck?.projectId === pid
+        })
+        localStorage.setItem(deckCardsKey(pid), JSON.stringify(projectDeckCards))
+      }
       return { deckCards }
     })
   },
@@ -86,7 +101,13 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
     set(state => {
       const deckCards = state.deckCards.filter(dc => !(dc.deckId === deckId && dc.cardId === cardId))
       const pid = state.decks.find(d => d.id === deckId)?.projectId
-      if (pid) localStorage.setItem(deckCardsKey(pid), JSON.stringify(deckCards))
+      if (pid) {
+        const projectDeckCards = deckCards.filter(dc => {
+          const deck = state.decks.find(d => d.id === dc.deckId)
+          return deck?.projectId === pid
+        })
+        localStorage.setItem(deckCardsKey(pid), JSON.stringify(projectDeckCards))
+      }
       return { deckCards }
     })
   },
@@ -97,7 +118,13 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
         dc.deckId === deckId && dc.cardId === cardId ? { ...dc, quantity: Math.max(1, quantity) } : dc
       )
       const pid = state.decks.find(d => d.id === deckId)?.projectId
-      if (pid) localStorage.setItem(deckCardsKey(pid), JSON.stringify(deckCards))
+      if (pid) {
+        const projectDeckCards = deckCards.filter(dc => {
+          const deck = state.decks.find(d => d.id === dc.deckId)
+          return deck?.projectId === pid
+        })
+        localStorage.setItem(deckCardsKey(pid), JSON.stringify(projectDeckCards))
+      }
       return { deckCards }
     })
   },
@@ -112,7 +139,12 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
 
   saveDecks: (projectId) => {
     const state = get()
-    localStorage.setItem(decksKey(projectId), JSON.stringify(state.decks))
-    localStorage.setItem(deckCardsKey(projectId), JSON.stringify(state.deckCards))
+    const projectDecks = state.decks.filter(d => d.projectId === projectId)
+    const projectDeckCards = state.deckCards.filter(dc => {
+      const deck = state.decks.find(d => d.id === dc.deckId)
+      return deck?.projectId === projectId
+    })
+    localStorage.setItem(decksKey(projectId), JSON.stringify(projectDecks))
+    localStorage.setItem(deckCardsKey(projectId), JSON.stringify(projectDeckCards))
   },
 }))

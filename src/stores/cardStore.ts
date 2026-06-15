@@ -29,7 +29,12 @@ export const useCardStore = create<CardStore>((set, get) => ({
 
   loadCards: (projectId) => {
     const data = localStorage.getItem(storageKey(projectId))
-    set({ cards: data ? JSON.parse(data) : [] })
+    const loadedCards = data ? JSON.parse(data) : []
+    const filteredCards = loadedCards.filter((c: Card) => c.projectId === projectId)
+    set({ cards: filteredCards })
+    if (filteredCards.length !== loadedCards.length) {
+      localStorage.setItem(storageKey(projectId), JSON.stringify(filteredCards))
+    }
   },
 
   addCard: (projectId, templateId) => {
@@ -52,7 +57,8 @@ export const useCardStore = create<CardStore>((set, get) => ({
     }
     set(state => {
       const cards = [...state.cards, card]
-      localStorage.setItem(storageKey(projectId), JSON.stringify(cards))
+      const projectCards = cards.filter(c => c.projectId === projectId)
+      localStorage.setItem(storageKey(projectId), JSON.stringify(projectCards))
       return { cards }
     })
     return card.id
@@ -62,7 +68,10 @@ export const useCardStore = create<CardStore>((set, get) => ({
     set(state => {
       const cards = state.cards.filter(c => c.id !== id)
       const pid = state.cards.find(c => c.id === id)?.projectId
-      if (pid) localStorage.setItem(storageKey(pid), JSON.stringify(cards))
+      if (pid) {
+        const projectCards = cards.filter(c => c.projectId === pid)
+        localStorage.setItem(storageKey(pid), JSON.stringify(projectCards))
+      }
       return { cards }
     })
   },
@@ -70,8 +79,11 @@ export const useCardStore = create<CardStore>((set, get) => ({
   updateCard: (id, updates) => {
     set(state => {
       const cards = state.cards.map(c => c.id === id ? { ...c, ...updates } : c)
-      const pid = state.cards.find(c => c.id === id)?.projectId
-      if (pid) localStorage.setItem(storageKey(pid), JSON.stringify(cards))
+      const updatedCard = cards.find(c => c.id === id)
+      if (updatedCard?.projectId) {
+        const projectCards = cards.filter(c => c.projectId === updatedCard.projectId)
+        localStorage.setItem(storageKey(updatedCard.projectId), JSON.stringify(projectCards))
+      }
       return { cards }
     })
   },
@@ -89,8 +101,11 @@ export const useCardStore = create<CardStore>((set, get) => ({
           : { backElements: [...c.backElements, element] }
         return { ...c, ...elements }
       })
-      const pid = state.cards.find(c => c.id === cardId)?.projectId
-      if (pid) localStorage.setItem(storageKey(pid), JSON.stringify(cards))
+      const updatedCard = cards.find(c => c.id === cardId)
+      if (updatedCard?.projectId) {
+        const projectCards = cards.filter(c => c.projectId === updatedCard.projectId)
+        localStorage.setItem(storageKey(updatedCard.projectId), JSON.stringify(projectCards))
+      }
       return { cards }
     })
   },
@@ -103,8 +118,11 @@ export const useCardStore = create<CardStore>((set, get) => ({
         const elements = c[key].map(e => e.id === elementId ? { ...e, ...updates } : e)
         return { ...c, [key]: elements }
       })
-      const pid = state.cards.find(c => c.id === cardId)?.projectId
-      if (pid) localStorage.setItem(storageKey(pid), JSON.stringify(cards))
+      const updatedCard = cards.find(c => c.id === cardId)
+      if (updatedCard?.projectId) {
+        const projectCards = cards.filter(c => c.projectId === updatedCard.projectId)
+        localStorage.setItem(storageKey(updatedCard.projectId), JSON.stringify(projectCards))
+      }
       return { cards }
     })
   },
@@ -117,20 +135,26 @@ export const useCardStore = create<CardStore>((set, get) => ({
         const elements = c[key].filter(e => e.id !== elementId)
         return { ...c, [key]: elements }
       })
-      const pid = state.cards.find(c => c.id === cardId)?.projectId
-      if (pid) localStorage.setItem(storageKey(pid), JSON.stringify(cards))
+      const updatedCard = cards.find(c => c.id === cardId)
+      if (updatedCard?.projectId) {
+        const projectCards = cards.filter(c => c.projectId === updatedCard.projectId)
+        localStorage.setItem(storageKey(updatedCard.projectId), JSON.stringify(projectCards))
+      }
       return { cards }
     })
   },
 
   batchNumber: (projectId, prefix, startNum) => {
     set(state => {
-      const cards = state.cards.map((c, i) => {
+      const projectCards = state.cards.filter(c => c.projectId === projectId)
+      const cards = state.cards.map(c => {
         if (c.projectId !== projectId) return c
-        const num = startNum + i
+        const idx = projectCards.findIndex(pc => pc.id === c.id)
+        const num = startNum + idx
         return { ...c, number: `${prefix}${String(num).padStart(3, '0')}` }
       })
-      localStorage.setItem(storageKey(projectId), JSON.stringify(cards))
+      const updatedProjectCards = cards.filter(c => c.projectId === projectId)
+      localStorage.setItem(storageKey(projectId), JSON.stringify(updatedProjectCards))
       return { cards }
     })
   },
@@ -142,8 +166,11 @@ export const useCardStore = create<CardStore>((set, get) => ({
         const attributes = c.attributes.map(a => a.id === attrId ? { ...a, ...updates } : a)
         return { ...c, attributes }
       })
-      const pid = state.cards.find(c => c.id === cardId)?.projectId
-      if (pid) localStorage.setItem(storageKey(pid), JSON.stringify(cards))
+      const updatedCard = cards.find(c => c.id === cardId)
+      if (updatedCard?.projectId) {
+        const projectCards = cards.filter(c => c.projectId === updatedCard.projectId)
+        localStorage.setItem(storageKey(updatedCard.projectId), JSON.stringify(projectCards))
+      }
       return { cards }
     })
   },
@@ -154,8 +181,11 @@ export const useCardStore = create<CardStore>((set, get) => ({
         if (c.id !== cardId) return c
         return { ...c, attributes: [...c.attributes, { id: uuid(), label, value }] }
       })
-      const pid = state.cards.find(c => c.id === cardId)?.projectId
-      if (pid) localStorage.setItem(storageKey(pid), JSON.stringify(cards))
+      const updatedCard = cards.find(c => c.id === cardId)
+      if (updatedCard?.projectId) {
+        const projectCards = cards.filter(c => c.projectId === updatedCard.projectId)
+        localStorage.setItem(storageKey(updatedCard.projectId), JSON.stringify(projectCards))
+      }
       return { cards }
     })
   },
@@ -166,8 +196,11 @@ export const useCardStore = create<CardStore>((set, get) => ({
         if (c.id !== cardId) return c
         return { ...c, attributes: c.attributes.filter(a => a.id !== attrId) }
       })
-      const pid = state.cards.find(c => c.id === cardId)?.projectId
-      if (pid) localStorage.setItem(storageKey(pid), JSON.stringify(cards))
+      const updatedCard = cards.find(c => c.id === cardId)
+      if (updatedCard?.projectId) {
+        const projectCards = cards.filter(c => c.projectId === updatedCard.projectId)
+        localStorage.setItem(storageKey(updatedCard.projectId), JSON.stringify(projectCards))
+      }
       return { cards }
     })
   },
@@ -177,7 +210,8 @@ export const useCardStore = create<CardStore>((set, get) => ({
       const cards = state.cards.map(c =>
         c.projectId === projectId ? { ...c, background } : c
       )
-      localStorage.setItem(storageKey(projectId), JSON.stringify(cards))
+      const projectCards = cards.filter(c => c.projectId === projectId)
+      localStorage.setItem(storageKey(projectId), JSON.stringify(projectCards))
       return { cards }
     })
   },

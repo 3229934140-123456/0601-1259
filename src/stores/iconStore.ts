@@ -27,7 +27,8 @@ export const useIconStore = create<IconStore>((set, get) => ({
     const icon: Icon = { id: uuid(), projectId, name, category, dataUrl, format, tags }
     set(state => {
       const icons = [...state.icons, icon]
-      localStorage.setItem(storageKey(projectId), JSON.stringify(icons))
+      const projectIcons = icons.filter(i => i.projectId === projectId)
+      localStorage.setItem(storageKey(projectId), JSON.stringify(projectIcons))
       return { icons }
     })
     return icon.id
@@ -37,7 +38,10 @@ export const useIconStore = create<IconStore>((set, get) => ({
     set(state => {
       const icons = state.icons.filter(i => i.id !== id)
       const pid = state.icons.find(i => i.id === id)?.projectId
-      if (pid) localStorage.setItem(storageKey(pid), JSON.stringify(icons))
+      if (pid) {
+        const projectIcons = icons.filter(i => i.projectId === pid)
+        localStorage.setItem(storageKey(pid), JSON.stringify(projectIcons))
+      }
       return { icons }
     })
   },
@@ -46,7 +50,10 @@ export const useIconStore = create<IconStore>((set, get) => ({
     set(state => {
       const icons = state.icons.map(i => i.id === id ? { ...i, ...updates } : i)
       const pid = state.icons.find(i => i.id === id)?.projectId
-      if (pid) localStorage.setItem(storageKey(pid), JSON.stringify(icons))
+      if (pid) {
+        const projectIcons = icons.filter(i => i.projectId === pid)
+        localStorage.setItem(storageKey(pid), JSON.stringify(projectIcons))
+      }
       return { icons }
     })
   },

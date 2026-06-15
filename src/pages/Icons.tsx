@@ -4,6 +4,7 @@ import { Upload, Search, Tag, Trash2, Plus, X, Image, Check, Grid } from 'lucide
 import { useIconStore } from '@/stores/iconStore'
 import type { Icon } from '@/types'
 import { ICON_CATEGORIES } from '@/types'
+import { storePendingIcon } from '@/utils/canvasElements'
 
 const ALL_CATEGORIES = ['全部', ...ICON_CATEGORIES] as const
 
@@ -123,7 +124,9 @@ export default function Icons() {
   }
 
   const handleInsertCanvas = () => {
-    if (projectId) navigate(`/canvas/${projectId}`)
+    if (!selectedIcon || !projectId) return
+    storePendingIcon(selectedIcon.dataUrl)
+    navigate(`/canvas/${projectId}`)
   }
 
   return (
