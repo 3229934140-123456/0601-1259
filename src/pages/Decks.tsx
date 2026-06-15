@@ -1,14 +1,16 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'react-router-dom'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Plus, Trash2, Minus, Palette, Layers, Search, X, Check } from 'lucide-react'
 import { useDeckStore } from '@/stores/deckStore'
 import { useCardStore } from '@/stores/cardStore'
 import { useProjectStore } from '@/stores/projectStore'
 import CardPreview from '@/components/CardPreview'
 import Modal, { ConfirmModal } from '@/components/Modal'
+import { cn } from '@/lib/utils'
 
 export default function Decks() {
   const { projectId } = useParams()
+  const [searchParams] = useSearchParams()
   const decks = useDeckStore(s => s.decks)
   const allDeckCards = useDeckStore(s => s.deckCards)
   const {
@@ -38,6 +40,7 @@ export default function Decks() {
   const [bgColor, setBgColor] = useState('#2E2824')
   const [showBgPreview, setShowBgPreview] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [highlightCardId, setHighlightCardId] = useState<string | null>(null)
 
   useEffect(() => {
     if (projectId) {
@@ -45,6 +48,20 @@ export default function Decks() {
       loadCards(projectId)
     }
   }, [projectId, loadDecks, loadCards])
+
+  useEffect(() => {
+    const cardIdFromUrl = searchParams.get('highlightCardId')
+    if (cardIdFromUrl && projectId) {
+      setHighlightCardId(cardIdFromUrl)
+      const deckWithCard = decks.find(deck => {
+        const deckCards = getDeckCards(deck.id)
+        return deckCards.some(dc => dc.cardId === cardIdFromUrl)
+      })
+      if (deckWithCard) {
+        setSelectedDeckId(deckWithCard.id)
+      }
+    }
+  }, [searchParams, projectId, decks, getDeckCards])
 
   const project = projectId ? getProject(projectId) : null
   const projectCards = projectId ? getProjectCards(projectId) : []
@@ -241,8 +258,15 @@ export default function Decks() {
                   {deckCards.map(dc => {
                     const card = getCard(dc.cardId)
                     if (!card) return null
+                    const isHighlighted = card.id === highlightCardId
                     return (
-                      <div key={dc.id} className="card-frame p-3 flex flex-col items-center group relative">
+                      <div
+                        key={dc.id}
+                        className={cn(
+                          "card-frame p-3 flex flex-col items-center group relative transition-all duration-300",
+                          isHighlighted && "ring-2 ring-forge-gold ring-offset-2 ring-offset-forge-bg scale-105 shadow-lg shadow-forge-gold/30"
+                        )}
+                      >
                         <button
                           className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 bg-forge-crimson/80 hover:bg-forge-crimson text-white transition-all z-10"
                           onClick={() => removeCardFromDeck(selectedDeckId!, dc.cardId)}

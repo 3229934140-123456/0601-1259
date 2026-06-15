@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { v4 as uuid } from 'uuid'
 import { MousePointer2, Type, Square, Circle, Minus, Image, ZoomIn, ZoomOut, Grid3X3, Plus, ChevronUp, ChevronDown, Trash2, FlipHorizontal, Hash, Layers, Sliders, LayoutTemplate, RotateCcw } from 'lucide-react'
 import { useCardStore } from '@/stores/cardStore'
@@ -18,6 +18,7 @@ type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se' | null
 
 export default function Canvas() {
   const { projectId } = useParams()
+  const [searchParams] = useSearchParams()
   const canvasRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
@@ -94,6 +95,18 @@ export default function Canvas() {
       localStorage.setItem(`cf_active_card_${projectId}`, firstCard.id)
     }
   }, [cards, activeCardId, projectId, getProjectCards, setActiveCardId])
+
+  useEffect(() => {
+    const cardIdFromUrl = searchParams.get('cardId')
+    if (cardIdFromUrl && projectId) {
+      const cards = getProjectCards(projectId)
+      const cardExists = cards.some(c => c.id === cardIdFromUrl)
+      if (cardExists) {
+        setActiveCardId(cardIdFromUrl)
+        localStorage.setItem(`cf_active_card_${projectId}`, cardIdFromUrl)
+      }
+    }
+  }, [searchParams, projectId, getProjectCards, setActiveCardId])
 
   useEffect(() => {
     if (projectId && getProjectCards(projectId).length === 0) {
@@ -474,9 +487,7 @@ export default function Canvas() {
         case 'image':
           return <img src={element.content} className="w-full h-full object-cover pointer-events-none" alt="" />
         case 'icon':
-          return (
-            <div className="w-full h-full flex items-center justify-center pointer-events-none" dangerouslySetInnerHTML={{ __html: element.content }} />
-          )
+          return <img src={element.content} className="w-full h-full object-contain pointer-events-none" alt="" />
         default:
           return null
       }
